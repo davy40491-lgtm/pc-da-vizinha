@@ -1,0 +1,80 @@
+# pc criado pelo @elves7.pcm
+
+on:
+  workflow_dispatch:
+    inputs:
+      instance_number:
+        description: 'Instance Number (1-10)'
+        required: true
+        default: '1'
+        type: string
+
+job-rdp:
+  runs-on: windows-latest
+  timeout-minutes: 360
+
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: System Information
+      run: |
+        Write-Host "== ENIGMAKO RDP DEPLOYMENT ==" -ForegroundColor Cyan
+        Write-Host "Runner Name: ${{ github.event.inputs.instance_number }}" -ForegroundColor Green
+        Write-Host "Runner Env: $env:RUNNER_NAME" -ForegroundColor Green
+        Write-Host "Workflow: $env:GITHUB_WORKFLOW" -ForegroundColor Green
+
+    - name: SYSTEM SPECIFICATIONS
+      run: |
+        Get-ComputerInfo | Select-Object WindowsProductName, OsBuildNumber, OsArchitecture
+        Get-WmiObject Win32_Processor | Select-Object Name, NumberOfCores, MaxClockSpeed
+
+    - name: Enable RDP
+      run: |
+        Write-Host "Enabling Remote Desktop..."
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+        Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+        Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+    - name: Install Google Chrome (Silent)
+      run: |
+        $installerPath = "$env:TEMP\chrome_installer.exe"
+        Invoke-WebRequest -Uri "https://dl.google.com/chrome/install/latest/chrome_installer.exe" -OutFile $installerPath
+        Start-Process -FilePath $installerPath -ArgumentList "/silent /install" -Wait
+        Remove-Item -ItemPath $installerPath -Force
+        Write-Host "Google Chrome Installed!" -ForegroundColor Green
+
+    - name: Install 7-Zip (Direct)
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        $zipUrl = "https://www.7-zip.org/a/7z2409-x64.exe"
+        $zipPath = "$env:TEMP\7z.exe"
+        Write-Host "Downloading 7-Zip..." -ForegroundColor Cyan
+        Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath
+        Write-Host "Installing 7-Zip silently..." -ForegroundColor Cyan
+        Start-Process -FilePath $zipPath -ArgumentList "/S" -Wait
+        Remove-Item -ItemPath $zipPath -Force
+        Write-Host "7-Zip installed!" -ForegroundColor Green
+
+    - name: Connection Details (TAILSCALE)
+      run: |
+        Write-Host "== ENIGMANAKO RDP ACCESS ==" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "  Host: $env:TAILSCALE_IP" -ForegroundColor Green
+        Write-Host "  Username: runneradmin" -ForegroundColor Green
+        Write-Host "  Password: pssword1" -ForegroundColor Green
+
+    - name: Keep Session Alive
+      run: |
+        Write-Host "== SESSION ACTIVE ==" -ForegroundColor Cyan
+        Write-Host "Enigmanako RDP instance is now running!" -ForegroundColor Green
+        Write-Host "Instance will remain active for up to 6 hours." -ForegroundColor Green
+        Write-Host "Do not close this window to maintain the connection." -ForegroundColor Green
+
+        $counter = 0
+        While ($true) {
+          $counter++
+          Write-Host "Website status - Heartbeat #$counter..." -ForegroundColor Cyan
+          Start-Sleep -Seconds 60
+        }
+        
